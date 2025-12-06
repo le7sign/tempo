@@ -4,44 +4,43 @@ export default async function handler(req, res) {
   const clientId = process.env.SPOTIFY_CLIENT_ID;
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
   
-  let tokenResult = null;
-  let recsResult = null;
-  let error = null;
+  let results = {};
   
   try {
-    // שלב 1: קבלת token
+    // קבלת token
     const tokenResponse = await fetch('https://accounts.spotify.com/api/token', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: `grant_type=client_credentials&client_id=${clientId}&client_secret=${clientSecret}`
     });
     
-    const tokenText = await tokenResponse.text();
-    const tokenData = JSON.parse(tokenText);
-    tokenResult = { status: tokenResponse.status, hasToken: !!tokenData.access_token };
+    const tokenData = await tokenResponse.json();
+    const token = tokenData.access_token;
     
-    if (!tokenData.access_token) {
-      throw new Error('No token');
-    }
-    
-    // שלב 2: קריאה ל-recommendations
-    const recsUrl = 'https://api.spotify.com/v1/recommendations?seed_genres=pop&limit=5&market=US';
-    const recsResponse = await fetch(recsUrl, {
-      headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
+    // בדיקה 1: recommendations
+    const recs = await fetch('https://api.spotify.com/v1/recommendations?seed_genres=pop&limit=3&market=US', {
+      headers: { 'Authorization': `Bearer ${token}` }
     });
+    const recsText = await recs.text();
+    results.recommendations = { status: recs.status, body: recsText.substring(0, 300) };
     
-    const recsText = await recsResponse.text();
-    recsResult = {
-      status: recsResponse.status,
-      bodyLength: recsText.length,
-      preview: recsText.substring(0, 500)
-    };
+    // בדיקה 2: search
+    const search = await fetch('https://api.spotify.com/v1/search?q=pop&type=track&limit=3&market=US', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const searchText = await search.text();
+    results.search = { status: search.status, body: searchText.substring(0, 300) };
+    
+    // בדיקה 3: genres
+    const genres = await fetch('https://api.spotify.com/v1/recommendations/available-genre-seeds', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const genresText = await genres.text();
+    results.genres = { status: genres.status, body: genresText.substring(0, 300) };
     
   } catch (err) {
-    error = err.message;
+    results.error = err.message;
   }
   
-  return res.status(200).json({ tokenResult, recsResult, error });
+  return res.status(200).json(results);
 }
