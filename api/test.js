@@ -4,18 +4,13 @@ export default async function handler(req, res) {
   const clientId = process.env.SPOTIFY_CLIENT_ID;
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
   
-  // בדיקה 1: האם המפתחות קיימים?
-  const hasId = !!clientId;
-  const hasSecret = !!clientSecret;
-  const idLength = clientId ? clientId.length : 0;
-  const secretLength = clientSecret ? clientSecret.length : 0;
-  
-  // בדיקה 2: נסיון לקבל token
   let tokenResult = null;
-  let tokenError = null;
+  let recsResult = null;
+  let error = null;
   
   try {
-    const response = await fetch('https://accounts.spotify.com/api/token', {
+    // שלב 1: קבלת token
+    const tokenResponse = await fetch('https://accounts.spotify.com/api/token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -23,25 +18,30 @@ export default async function handler(req, res) {
       body: `grant_type=client_credentials&client_id=${clientId}&client_secret=${clientSecret}`
     });
     
-    const text = await response.text();
-    tokenResult = {
-      status: response.status,
-      bodyLength: text.length,
-      body: text.substring(0, 300)
+    const tokenText = await tokenResponse.text();
+    const tokenData = JSON.parse(tokenText);
+    tokenResult = { status: tokenResponse.status, hasToken: !!tokenData.access_token };
+    
+    if (!tokenData.access_token) {
+      throw new Error('No token');
+    }
+    
+    // שלב 2: קריאה ל-recommendations
+    const recsUrl = 'https://api.spotify.com/v1/recommendations?seed_genres=pop&limit=5&market=US';
+    const recsResponse = await fetch(recsUrl, {
+      headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
+    });
+    
+    const recsText = await recsResponse.text();
+    recsResult = {
+      status: recsResponse.status,
+      bodyLength: recsText.length,
+      preview: recsText.substring(0, 500)
     };
+    
   } catch (err) {
-    tokenError = err.message;
+    error = err.message;
   }
   
-  return res.status(200).json({
-    envCheck: {
-      hasClientId: hasId,
-      hasClientSecret: hasSecret,
-      clientIdLength: idLength,
-      clientSecretLength: secretLength,
-      clientIdStart: clientId ? clientId.substring(0, 5) + '...' : null
-    },
-    tokenResult,
-    tokenError
-  });
+  return res.status(200).json({ tokenResult, recsResult, error });
 }
