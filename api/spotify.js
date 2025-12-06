@@ -1,3 +1,4 @@
+// v2
 const genreMap = {
   'Pop': 'pop', 'Rock': 'rock', 'Hip Hop': 'hip hop', 'Jazz': 'jazz',
   'Classical': 'classical', 'Electronic': 'electronic', 'R&B': 'r&b',
