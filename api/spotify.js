@@ -45,6 +45,8 @@ async function getSpotifyToken() {
     throw new Error('Missing Spotify credentials');
   }
   
+  console.log('Requesting token...');
+  
   const response = await fetch('https://accounts.spotify.com/api/token', {
     method: 'POST',
     headers: {
@@ -53,7 +55,11 @@ async function getSpotifyToken() {
     body: `grant_type=client_credentials&client_id=${clientId}&client_secret=${clientSecret}`
   });
   
+  console.log('Token response status:', response.status);
+  
   const text = await response.text();
+  console.log('Token response:', text ? text.substring(0, 100) : 'EMPTY');
+  
   if (!text) {
     throw new Error('Empty response from Spotify token endpoint');
   }
@@ -68,6 +74,7 @@ async function getSpotifyToken() {
 
 async function searchSpotify(params, excludeIds = []) {
   const token = await getSpotifyToken();
+  console.log('Got token, searching...');
   
   const { tempoMin, tempoMax, key, scale, timeSignature, genres, regions, vocalType, yearMin, yearMax, artistName } = params;
   
@@ -120,21 +127,30 @@ async function searchSpotify(params, excludeIds = []) {
   recParams.append('limit', 30);
   
   const url = `https://api.spotify.com/v1/recommendations?${recParams.toString()}`;
+  console.log('Spotify URL:', url);
   
   const response = await fetch(url, {
     headers: { 'Authorization': `Bearer ${token}` }
   });
   
+  console.log('Spotify API status:', response.status);
+  
   const text = await response.text();
+  console.log('Spotify API response length:', text ? text.length : 0);
+  console.log('Spotify API response preview:', text ? text.substring(0, 200) : 'EMPTY');
+  
   if (!text) {
-    throw new Error('Empty response from Spotify API');
+    throw new Error('Empty response from Spotify API, status: ' + response.status);
   }
   
   const data = JSON.parse(text);
   
   if (!data.tracks) {
+    console.log('No tracks field in response');
     return [];
   }
+  
+  console.log('Got', data.tracks.length, 'tracks');
   
   let tracks = data.tracks;
   
